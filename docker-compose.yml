@@ -1,0 +1,63 @@
+# NOTE: written to spec but not executed in the authoring sandbox (no Docker there).
+# First run: docker compose up -d postgres && docker compose run --rm ingest && docker compose up -d
+services:
+  postgres:
+    image: postgres:16
+    environment: {POSTGRES_USER: tower, POSTGRES_PASSWORD: tower, POSTGRES_DB: control_tower}
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/superset_views.sql:/docker-entrypoint-initdb.d/02_views.sql:ro
+    healthcheck: {test: ["CMD-SHELL","pg_isready -U tower -d control_tower"], interval: 5s, retries: 10}
+
+  ingest:            # one-shot: loads DataCo CSV (or synthetic fallback) into Postgres
+    image: python:3.11-slim
+    working_dir: /app
+    volumes: ["./:/app"]
+    environment: &env
+      DATABASE_URL: postgresql+psycopg2://tower:tower@postgres:5432/control_tower
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+    command: sh -c "pip install -q -r requirements.txt && python -m src.ingest_data"
+    depends_on: {postgres: {condition: service_healthy}}
+    profiles: ["tools"]
+
+  airflow:
+    image: apache/airflow:2.9.3-python3.11
+    environment:
+      <<: *env
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /app/dags
+      PYTHONPATH: /app
+      _PIP_ADDITIONAL_REQUIREMENTS: "prophet scikit-learn psycopg2-binary SQLAlchemy<2.1 requests"
+    volumes: ["./:/app"]
+    ports: ["8080:8080"]
+    command: standalone
+    depends_on: {postgres: {condition: service_healthy}}
+
+  superset:
+    image: apache/superset:3.1.3
+    environment: {SUPERSET_SECRET_KEY: change-me-please, SUPERSET_LOAD_EXAMPLES: "no"}
+    ports: ["8088:8088"]
+    command: >
+      sh -c "pip install -q psycopg2-binary &&
+             superset db upgrade &&
+             superset fab create-admin --username admin --password admin --firstname a --lastname b --email a@b.c || true;
+             superset init && superset run -h 0.0.0.0 -p 8088"
+    depends_on: {postgres: {condition: service_healthy}}
+
+  whatif:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes: ["./:/app"]
+    environment: *env
+    ports: ["8501:8501"]
+    command: sh -c "pip install -q pandas numpy SQLAlchemy psycopg2-binary streamlit plotly && streamlit run app/whatif.py --server.port 8501 --server.address 0.0.0.0"
+    depends_on: {postgres: {condition: service_healthy}}
+
+volumes: {pgdata: {}}
