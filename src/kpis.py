@@ -14,12 +14,15 @@ def stockout_rate(latest_stock: pd.DataFrame) -> float:
     return float((latest_stock["current_stock_level"] == 0).mean() * 100.0)
 
 
-def otd_rate(shipments: pd.DataFrame, since: pd.Timestamp | None = None) -> tuple[float, int]:
+def otd_rate(shipments: pd.DataFrame, since: pd.Timestamp | None = None,
+             until: pd.Timestamp | None = None) -> tuple[float, int]:
     """(OTD %, n delivered). Delivered = actual_delivery_date not null (optionally delivered since `since`).
     On time = actual <= scheduled. Returns (nan, 0) if nothing delivered."""
     d = shipments[shipments["actual_delivery_date"].notna()]
     if since is not None:
         d = d[d["actual_delivery_date"] >= since]
+    if until is not None:                       # exclusive upper bound (lets a baseline exclude the current window)
+        d = d[d["actual_delivery_date"] < until]
     n = len(d)
     if n == 0:
         return float("nan"), 0

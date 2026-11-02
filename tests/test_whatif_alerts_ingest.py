@@ -25,10 +25,20 @@ def test_stockout_alert_rule_and_cap():
     assert alerts.stockout_risk_alerts(doi, lt, prods, T, max_alerts=0) == []
 
 
-def test_otd_alert_needs_min_sample_and_threshold():
-    assert alerts.otd_breach_alert(80.0, 2, T) == []        # too few shipments
-    assert alerts.otd_breach_alert(95.0, 50, T) == []       # healthy
-    assert len(alerts.otd_breach_alert(85.0, 50, T)) == 1
+def test_otd_fixed_mode_needs_min_sample_and_threshold():
+    assert alerts.otd_breach_alert(80.0, 2, T, mode="fixed") == []        # too few shipments
+    assert alerts.otd_breach_alert(95.0, 50, T, mode="fixed") == []       # healthy
+    assert len(alerts.otd_breach_alert(85.0, 50, T, mode="fixed")) == 1
+
+
+def test_otd_baseline_mode_ignores_normally_low_level_and_catches_real_drops():
+    # Network normally sits at 42% (real DataCo). 40% now is normal; a fixed 90% rule would have fired.
+    assert alerts.otd_breach_alert(40.0, 80, T, baseline_pct=42.0, mode="baseline") == []
+    assert alerts.otd_breach_alert(25.0, 100, T, baseline_pct=42.0, mode="baseline")      # 17-point drop, n=100: significant
+    assert alerts.otd_breach_alert(25.0, 6, T, baseline_pct=42.0, mode="baseline") == []  # same drop but n=6: noise
+    assert alerts.otd_breach_alert(30.0, 100, T, baseline_pct=None, mode="baseline") == []  # no history -> no alert
+    msg = alerts.otd_breach_alert(25.0, 100, T, baseline_pct=42.0, mode="baseline")[0]["message"]
+    assert "baseline" in msg and "17.0 points" in msg
 
 
 def test_dispatch_without_channels_does_not_raise():

@@ -198,8 +198,10 @@ def dispatch_alerts(ts) -> dict:
     for c in ("order_date", "scheduled_delivery_date", "actual_delivery_date"):
         ship[c] = pd.to_datetime(ship[c])
     lt = kpis.supplier_lead_time(ship)
-    otd, n = kpis.otd_rate(ship, since=ts - pd.Timedelta(hours=config.OTD_WINDOW_HOURS))
-    new = A.stockout_risk_alerts(doi, lt, prods, ts, config.MAX_STOCKOUT_ALERTS_PER_RUN) + A.otd_breach_alert(otd, n, ts)
+    win_start = ts - pd.Timedelta(hours=config.OTD_WINDOW_HOURS)
+    otd, n = kpis.otd_rate(ship, since=win_start)
+    baseline, _ = kpis.otd_rate(ship, since=ts - pd.Timedelta(days=config.OTD_BASELINE_DAYS), until=win_start)
+    new = A.stockout_risk_alerts(doi, lt, prods, ts, config.MAX_STOCKOUT_ALERTS_PER_RUN) + A.otd_breach_alert(otd, n, ts, baseline)
     _insert_alerts(new)
     pending = read_sql("SELECT alert_id, alert_type, severity, message FROM alerts_log WHERE NOT dispatched ORDER BY created_at")
     rows = pending.to_dict("records")

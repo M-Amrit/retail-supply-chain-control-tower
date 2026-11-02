@@ -23,6 +23,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      OTD_ALERT_MODE: ${OTD_ALERT_MODE:-baseline}
+      OTD_THRESHOLD_PCT: ${OTD_THRESHOLD_PCT:-90}
     command: sh -c "pip install -q -r requirements.txt && python -m src.ingest_data"
     depends_on: {postgres: {condition: service_healthy}}
     profiles: ["tools"]

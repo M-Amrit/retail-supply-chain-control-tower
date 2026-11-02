@@ -26,13 +26,33 @@ def stockout_risk_alerts(doi: pd.DataFrame, supplier_lead: pd.DataFrame, product
     return out
 
 
-def otd_breach_alert(otd_pct: float, n: int, ts: pd.Timestamp) -> list[dict]:
-    if n < config.OTD_MIN_SAMPLE or pd.isna(otd_pct) or otd_pct >= config.OTD_THRESHOLD_PCT:
+def otd_breach_alert(otd_pct: float, n: int, ts: pd.Timestamp, baseline_pct: float | None = None,
+                     mode: str | None = None) -> list[dict]:
+    """OTD alert. mode="fixed": alert when window OTD < OTD_THRESHOLD_PCT.
+    mode="baseline" (default): alert only when window OTD is BOTH >= OTD_DROP_POINTS below the trailing baseline
+    AND statistically unlikely under it (binomial z >= OTD_Z). Fixed thresholds are meaningless when the normal
+    level is already low (real DataCo data sits near 40%), and small hourly samples are very noisy."""
+    mode = mode or config.OTD_ALERT_MODE
+    if n < config.OTD_MIN_SAMPLE or pd.isna(otd_pct):
         return []
+    key = f"OTD_BREACH:{ts.floor('h')}"
+    if mode == "fixed":
+        if otd_pct >= config.OTD_THRESHOLD_PCT:
+            return []
+        thr, msg = config.OTD_THRESHOLD_PCT, f"On-time delivery {otd_pct:.1f}% over last {config.OTD_WINDOW_HOURS}h (n={n}) < {config.OTD_THRESHOLD_PCT:.0f}%"
+    else:
+        if baseline_pct is None or pd.isna(baseline_pct):
+            return []
+        b = baseline_pct / 100.0
+        se = (b * (1 - b) / n) ** 0.5
+        drop = baseline_pct - otd_pct
+        if drop < config.OTD_DROP_POINTS or se == 0 or (drop / 100.0) / se < config.OTD_Z:
+            return []
+        thr = baseline_pct - config.OTD_DROP_POINTS
+        msg = (f"On-time delivery {otd_pct:.1f}% over last {config.OTD_WINDOW_HOURS}h (n={n}) is {drop:.1f} points "
+               f"below the {config.OTD_BASELINE_DAYS}-day baseline of {baseline_pct:.1f}%")
     return [dict(alert_type="OTD_BREACH", severity="high", entity_type="network", entity_id="all",
-                 metric_value=float(otd_pct), threshold_value=config.OTD_THRESHOLD_PCT,
-                 message=f"On-time delivery {otd_pct:.1f}% over last {config.OTD_WINDOW_HOURS}h (n={n}) < {config.OTD_THRESHOLD_PCT:.0f}%",
-                 dedup_key=f"OTD_BREACH:{ts.floor('h')}")]
+                 metric_value=float(otd_pct), threshold_value=float(thr), message=msg, dedup_key=key)]
 
 
 def delay_alerts(df: pd.DataFrame, ts: pd.Timestamp) -> list[dict]:
