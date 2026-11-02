@@ -3,3 +3,4 @@ __pycache__/
 data/feed/
 data/*.csv
 .env
+*.zip
