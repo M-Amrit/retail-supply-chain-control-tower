@@ -74,7 +74,8 @@ def send_email(subject: str, body: str) -> bool:
     msg["Subject"], msg["From"], msg["To"] = subject, config.SMTP_USER or "control-tower@localhost", config.ALERT_EMAIL_TO
     msg.set_content(body)
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=15) as s:
-        s.starttls()
+        if config.SMTP_STARTTLS:
+            s.starttls()
         if config.SMTP_USER:
             s.login(config.SMTP_USER, config.SMTP_PASSWORD)
         s.send_message(msg)

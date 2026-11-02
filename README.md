@@ -17,7 +17,8 @@ Download DataCo from Mendeley/Kaggle (needs your login) and place it in `data/`.
 cp .env.example .env
 docker compose up -d postgres                 # applies sql/schema.sql + superset views
 docker compose run --rm ingest                # python -m src.ingest_data  (add --synthetic if no CSV)
-docker compose up -d airflow superset whatif  # Airflow :8080, Superset :8088 (admin/admin), What-If :8501
+docker compose up -d --build airflow superset whatif  # Airflow :8080 (password in `docker compose logs airflow`), Superset :8088 (admin/admin), What-If :8501
+python scripts/superset_bootstrap.py          # optional, UNVERIFIED: creates datasets/charts/dashboard via REST API
 ```
 Without Docker: `pip install -r requirements.txt`, point `DATABASE_URL` at a Postgres with `sql/schema.sql` applied,
 `python -m src.ingest_data`, then `python -m src.run_local --hours 24 --start "<ts after last inventory row>"` to
@@ -43,8 +44,26 @@ lead time variance, OTD, reliability), `v_inventory_health` (filter `below_safet
 Dashboards are **not** pre-exported; build them from these views (≈30 min).
 The What-If panel is the Streamlit app (`app/whatif.py`), embeddable in Superset via iframe/Markdown chart.
 
+## Airflow design note
+Airflow pins SQLAlchemy 1.4; the pipeline needs 2.x, pandas and Prophet. Installing them into Airflow's own
+environment risks breaking Airflow, so tasks run in an isolated venv (`PIPELINE_PYTHON`) through
+`ExternalPythonOperator` (see `Dockerfile.airflow`). Harmless `pendulum`/`apache-airflow` metadata tracebacks may
+appear in task logs; the tasks still succeed (`expect_airflow=False`).
+
+## Alert tuning knobs (env)
+`OTD_THRESHOLD_PCT` (default 90), `OTD_WINDOW_HOURS`, `OTD_MIN_SAMPLE`. On real DataCo data a large share of orders are
+late by DataCo's own definition, so the 90% OTD alert may fire every hour: decide on a baseline-relative rule first.
+
 ## Verified vs. not verified
-Verified in an authoring sandbox (Postgres 16, Python 3.12): schema/views apply; ingestion; all six task functions
-for 24 consecutive simulated hours; idempotent reruns; 19 unit tests.
-**Not verified**: Docker Compose, the Airflow DAG executing under Airflow (only compiled), Prophet fitting, Superset,
-the Streamlit UI (its SQL was run), and Slack/SMTP delivery (only the no-channel console path).
+**Verified** (authoring sandbox: Ubuntu, Python 3.12, PostgreSQL 16, Airflow 2.10.5, Prophet 1.5, Streamlit 1.66):
+* schema + views apply; ingestion; all six task functions for 24+ consecutive simulated hours; idempotent reruns
+* the DAG imports and a full `airflow dags test` run finished with all 6 tasks SUCCESS (Prophet used for top-N series)
+* the Streamlit What-If app runs headlessly with no exceptions and reacts to its controls
+* Slack webhook and SMTP delivery against local mock servers (incl. Slack failing while email still succeeds)
+* 24 automated tests; the loader against a fixture in the real DataCo format (latin-1, m/d/Y dates, cancellations)
+
+**Not verified**
+* the **official DataCo CSV itself** (needs your Kaggle/Mendeley login) — all runs used the synthetic fallback
+* Docker Compose / Dockerfile.airflow builds (no Docker in the sandbox)
+* Superset, including `scripts/superset_bootstrap.py` (written from API docs, never run)
+* real Slack workspace / real SMTP provider

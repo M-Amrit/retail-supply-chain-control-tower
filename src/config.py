@@ -7,6 +7,7 @@ SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_STARTTLS = os.getenv("SMTP_STARTTLS", "1") != "0"   # keep on for real providers; off only for local mock servers
 ALERT_EMAIL_TO = os.getenv("ALERT_EMAIL_TO", "")
 
 DATACO_CSV = os.getenv("DATACO_CSV", "data/DataCoSupplyChainDataset.csv")
@@ -14,7 +15,7 @@ N_SUPPLIERS = int(os.getenv("N_SUPPLIERS", "12"))
 
 DELAY_SIGMA = 2.0            # delivery delay anomaly threshold (std devs over supplier mean lead time)
 SPIKE_SIGMA = 3.0            # demand spike threshold
-OTD_THRESHOLD_PCT = 90.0     # alert when OTD in window falls below this
+OTD_THRESHOLD_PCT = float(os.getenv("OTD_THRESHOLD_PCT", "90"))     # alert when OTD in window falls below this
 OTD_WINDOW_HOURS = int(os.getenv("OTD_WINDOW_HOURS", "1"))
 OTD_MIN_SAMPLE = int(os.getenv("OTD_MIN_SAMPLE", "5"))   # avoid alerting on 1-2 shipments
 FORECAST_HORIZON_DAYS = 7

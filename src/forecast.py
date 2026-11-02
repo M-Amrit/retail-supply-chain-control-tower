@@ -19,7 +19,7 @@ def seasonal_naive(history: pd.DataFrame, horizon: int = 7, weeks: int = 4) -> p
 
 def prophet_forecast(history: pd.DataFrame, horizon: int = 7) -> pd.DataFrame:
     from prophet import Prophet  # heavy import kept local
-    m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=len(history) >= 365)
+    m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=len(history) >= 730)
     m.fit(history[["ds", "y"]])
     fc = m.predict(m.make_future_dataframe(periods=horizon, freq="D")).tail(horizon)
     out = fc[["ds", "yhat", "yhat_lower", "yhat_upper"]].copy()

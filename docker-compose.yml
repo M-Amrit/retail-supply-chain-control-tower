@@ -28,16 +28,17 @@ services:
     profiles: ["tools"]
 
   airflow:
-    image: apache/airflow:2.9.3-python3.11
+    build: {context: ., dockerfile: Dockerfile.airflow}
     environment:
       <<: *env
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_FOLDER: /app/dags
-      PYTHONPATH: /app
-      _PIP_ADDITIONAL_REQUIREMENTS: "prophet scikit-learn psycopg2-binary SQLAlchemy<2.1 requests"
+      PIPELINE_PYTHON: /opt/pipeline-venv/bin/python
+      PROJECT_DIR: /app
+      FEED_DIR: /tmp/feed
     volumes: ["./:/app"]
     ports: ["8080:8080"]
-    command: standalone
+    command: standalone          # prints the generated admin password in the container logs
     depends_on: {postgres: {condition: service_healthy}}
 
   superset:

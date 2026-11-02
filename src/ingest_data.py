@@ -23,7 +23,13 @@ def load_dataco(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, encoding="latin-1", usecols=lambda c: c in REQUIRED)
     missing = set(REQUIRED) - set(df.columns)
     if missing:
-        raise ValueError(f"DataCo CSV missing columns: {sorted(missing)}")
+        raise ValueError(f"DataCo CSV missing columns: {sorted(missing)} (found {len(df.columns)} columns; "
+                         "is this the original 53-column DataCoSupplyChainDataset.csv?)")
+    col = "order date (DateOrders)"                      # native format e.g. '1/31/2018 22:56'
+    parsed = pd.to_datetime(df[col], format="%m/%d/%Y %H:%M", errors="coerce")
+    if parsed.isna().mean() > 0.5:                       # other export formats: fall back to inference
+        parsed = pd.to_datetime(df[col], errors="coerce")
+    df[col] = parsed
     return df
 
 
