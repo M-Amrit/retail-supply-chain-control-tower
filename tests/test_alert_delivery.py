@@ -7,12 +7,12 @@ from src import alerts, config
 ALERTS = [{"alert_id": 1, "alert_type": "STOCKOUT_RISK", "severity": "high", "message": "Product 1 @ West: 1.0 days < lead 4.0d"}]
 
 
-def _slack_server(status=200):
+def _slack_server(status=200, body=b"ok"):
     got = []
     class H(BaseHTTPRequestHandler):
         def do_POST(self):
             got.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-            self.send_response(status); self.end_headers(); self.wfile.write(b"ok")
+            self.send_response(status); self.end_headers(); self.wfile.write(body)
         def log_message(self, *a): pass
     srv = HTTPServer(("127.0.0.1", 0), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
@@ -54,3 +54,12 @@ def test_email_delivery_and_slack_failure_does_not_block_email(monkeypatch):
         assert box and box[0].rcpt_tos == ["mgr@example.com"] and b"STOCKOUT_RISK" in box[0].content
     finally:
         ctl.stop(); srv.shutdown()
+
+
+def test_html_200_response_is_treated_as_failure(monkeypatch):
+    """Regression: a bad/revoked webhook URL returned an HTML page with HTTP 200 and was wrongly reported as success."""
+    srv, _ = _slack_server(status=200, body=b"<!doctype html><html>Slack developer docs</html>")
+    monkeypatch.setattr(config, "SLACK_WEBHOOK_URL", f"http://127.0.0.1:{srv.server_port}/hook")
+    monkeypatch.setattr(config, "SMTP_HOST", "")
+    assert alerts.dispatch(ALERTS) is False          # not delivered => alerts stay undispatched and retry
+    srv.shutdown()

@@ -84,6 +84,11 @@ def send_slack(text: str, url: str | None = None) -> bool:
         return False
     r = requests.post(url, json={"text": text}, timeout=10)
     r.raise_for_status()
+    # A working Slack webhook answers with the literal body "ok". Anything else (e.g. an HTML page with HTTP 200 for a
+    # revoked/mistyped URL) means the message was NOT delivered, so fail loudly instead of reporting success.
+    if r.text.strip() != "ok":
+        raise RuntimeError(f"Slack did not accept the message (HTTP {r.status_code}); body starts {r.text[:40]!r}. "
+                           "Check SLACK_WEBHOOK_URL.")
     return True
 
 
