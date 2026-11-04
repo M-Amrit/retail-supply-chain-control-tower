@@ -1,6 +1,10 @@
 # Demo script (about 7 minutes)
 
 ## Before you start (5 minutes, do it once, off camera)
+Fast way (untested helper; it starts Docker, waits for services, prints the Airflow password and opens the tabs):
+`powershell -ExecutionPolicy Bypass -File scripts\demo_prep.ps1`  (add `-InsertTestAlert` to queue a demo alert for Slack).
+If it misbehaves, follow the manual list below.
+
 1. Open Docker Desktop and wait for "Engine running". Run `docker compose up -d` and wait about 3 minutes.
 2. `docker compose ps`: postgres and superset should say `(healthy)`.
 3. Airflow: `docker compose exec airflow cat /opt/airflow/standalone_admin_password.txt`, sign in as `admin` in a **private

@@ -45,10 +45,10 @@ BELOW = "SUM(CASE WHEN below_safety_stock THEN 1 ELSE 0 END)"
 OUT = "SUM(CASE WHEN stocked_out THEN 1 ELSE 0 END)"
 DASHBOARDS = {
     "Inventory Health": ("v_inventory_health", [
-        ("SKUs below safety stock", "big_number_total", {"metric": metric(BELOW, "below safety stock")}),
-        ("SKUs stocked out", "big_number_total", {"metric": metric(OUT, "stocked out")}),
-        ("SKUs tracked", "big_number_total", {"metric": metric("COUNT(*)", "SKUs")}),
-        ("Below safety stock by category", "echarts_timeseries_bar",
+        ("Products below safety stock", "big_number_total", {"metric": metric(BELOW, "below safety stock")}),
+        ("Products stocked out", "big_number_total", {"metric": metric(OUT, "stocked out")}),
+        ("Products tracked", "big_number_total", {"metric": metric("COUNT(*)", "products")}),
+        ("Products below safety stock by category", "echarts_timeseries_bar",
          {"x_axis": "category", "metrics": [metric(BELOW, "below safety stock")], "orientation": "vertical"}),
         ("Stock vs safety threshold by category", "table",
          {"query_mode": "aggregate", "groupby": ["category"], "all_columns": [], "order_desc": True,
