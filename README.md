@@ -14,6 +14,10 @@ and Slack/email alerting. See `docs/ERD.md` (ERD + pipeline flow), `docs/DATA_DI
 |---|---|
 | ![What-If panel](docs/screenshots/whatif-panel-14d.png) | ![Slack alert](docs/screenshots/slack-alert.png) |
 
+| Inventory Health (Superset) | Supplier Performance (Superset) |
+|---|---|
+| ![Inventory Health](docs/screenshots/superset-inventory-health.png) | ![Supplier Performance](docs/screenshots/superset-supplier-performance.png) |
+
 ## Dataset decision (read this)
 **DataCo Smart Supply Chain** is the dataset, but it does **not** contain a supplier entity or an inventory feed. This
 project therefore: (a) *derives* 12 suppliers by deterministic bucketing of products, (b) *simulates* inventory and
@@ -66,17 +70,28 @@ Without Docker: `pip install -r requirements.txt`, point `DATABASE_URL` at a Pos
 * `dim_products.supplier_id` was added (not in the brief) to model supplier -> product dependency for the What-If panel.
 
 ## Dashboards
-`scripts/superset_bootstrap.py` builds *Executive Overview* from the `v_*` views (verified working). The extra script adds
-*Inventory Health* (`v_inventory_health`) and *Supplier Performance* (`v_supplier_performance`); it is idempotent and was
-written from the API docs. If a chart fails, build it by hand from those datasets. The What-If panel is the Streamlit app.
+`scripts/superset_bootstrap.py` builds *Executive Overview* from the `v_*` views, and
+`scripts/superset_bootstrap_extra.py` adds *Inventory Health* (`v_inventory_health`) and *Supplier Performance*
+(`v_supplier_performance`). Both scripts rendered correctly on the author's machine; the extra one is idempotent. The
+What-If panel is the Streamlit app.
+
+Two things to know when reading them:
+* **Supplier charts are flat by construction.** Suppliers are derived from products, so lead time, variability,
+  reliability and on-time rate are almost identical across the 12 suppliers. The ranking table ranks noise.
+* **"Below safety stock" is judged per product**: stock summed over all warehouses against the product-wide threshold
+  (`dim_products.safety_stock_threshold`, 3 days of the product's total demand, minimum 5 units). Two earlier versions were
+  wrong: comparing that product-wide threshold with a single warehouse's stock flagged 419 of about 1,540 SKUs, and judging
+  each product x warehouse SKU by its own demand fails because DataCo's per-SKU sales are too sparse (about 31 selling days
+  per SKU over three years, so most SKUs had no sales in the last 30 days). If you set up the database before this fix,
+  refresh the views: `Get-Content sql\superset_views.sql | docker compose exec -T postgres psql -U tower -d control_tower`.
+  The pipeline's own stock-out rate and days-of-inventory KPIs stay at product x warehouse level.
 
 ## Verified vs. not verified
 **Verified on the author's machine** (Windows, Docker Desktop): ingestion of the real DataCo CSV (180,519 rows, none
-dropped); the full Docker stack; hourly Airflow runs with all six tasks succeeding; Prophet forecasts; the Executive
-Overview dashboard; the What-If app; Slack delivery of real detections; 26 automated tests.
+dropped); the full Docker stack; hourly Airflow runs with all six tasks succeeding; Prophet forecasts; the three Superset
+dashboards; the What-If app; Slack delivery of real detections; 26 automated tests.
 
 **Not verified**
 * email delivery against a real provider (only a mock SMTP server was used; see `docs/EMAIL_ALERTS.md`)
-* `scripts/superset_bootstrap_extra.py` against a live Superset (control flow tested against a stub only)
 * forecast accuracy on the real data (an earlier backtest on synthetic data showed only a small gain over the baseline)
 * behaviour at scale: runs used about 1,500 SKUs

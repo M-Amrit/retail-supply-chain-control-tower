@@ -7,7 +7,7 @@ SKU = one product at one warehouse. All timestamps are naive UTC.
 | | base_lead_time_days | Median order->delivery days of delivered shipments |
 | | reliability_score | 1 - share of deliveries later than scheduled (0-1) |
 | dim_products | category, unit_cost | DataCo category; unit_cost = **70% of mean list price (assumption)** |
-| | safety_stock_threshold | ceil(3 x average daily demand), min 5 |
+| | safety_stock_threshold | ceil(3 x the product's total average daily demand across all warehouses), min 5. Product-wide, so the Inventory Health view compares it with the product's stock summed over all warehouses |
 | fact_inventory_hourly | current_stock_level | Units on hand at `ts` (>=0). **Simulated** from observed demand |
 | | incoming_shipment_qty | Units received in that hour |
 | fact_shipments | scheduled/actual_delivery_date | order_date + DataCo scheduled / real shipping days. NULL actual => canceled |
